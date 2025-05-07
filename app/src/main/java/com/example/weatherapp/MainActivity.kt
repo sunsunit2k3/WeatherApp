@@ -1,81 +1,111 @@
-package com.example.weatherapp;
+package com.example.weatherapp
 
-import android.os.Bundle;
+import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.weatherapp.databinding.ActivityMainBinding
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-import com.google.android.material.snackbar.Snackbar;
+class MainActivity : AppCompatActivity() {
 
-import androidx.appcompat.app.AppCompatActivity;
+    private lateinit var binding: ActivityMainBinding
+    private val apiKey = "0cc1b5e403e162a6abb1cd61236e59ce"
+    private val TAG = "MainActivity"
 
-import android.view.View;
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
-import androidx.navigation.ui.AppBarConfiguration;
-import androidx.navigation.ui.NavigationUI;
+        // Thiết lập RecyclerView
+        binding.forecastRecyclerView.layoutManager = LinearLayoutManager(this)
 
-import com.example.weatherapp.databinding.ActivityMainBinding;
+        // Thiết lập Retrofit
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://api.openweathermap.org/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
 
-import android.view.Menu;
-import android.view.MenuItem;
+        val weatherApiService = retrofit.create(WeatherApiService::class.java)
 
-public class MainActivity extends AppCompatActivity {
-
-    private AppBarConfiguration appBarConfiguration;
-    private ActivityMainBinding binding;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-
-        setSupportActionBar(binding.toolbar);
-
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
-        appBarConfiguration = new AppBarConfiguration.Builder(navController.getGraph()).build();
-        NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
-
-        binding.fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAnchorView(R.id.fab)
-                        .setAction("Action", null).show();
+        // Xử lý khi nhấn nút lấy dự báo
+        binding.fetchButton.setOnClickListener {
+            val city = binding.cityEditText.text.toString().trim()
+            if (city.isEmpty()) {
+                Toast.makeText(this, "Vui lòng nhập tên thành phố", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
-        });
+
+            // Bước 1: Lấy tọa độ từ tên thành phố
+            weatherApiService.getGeocoding(city, limit = 1, apiKey = apiKey)
+                .enqueue(object : Callback<List<GeocodingResponse>> {
+                    override fun onResponse(call: Call<List<GeocodingResponse>>, response: Response<List<GeocodingResponse>>) {
+                        if (response.isSuccessful && response.body()?.isNotEmpty() == true) {
+                            val geoData = response.body()!![0]
+                            Log.d(TAG, "Lấy tọa độ thành công: lat=${geoData.lat}, lon=${geoData.lon}, city=${geoData.name}")
+                            // Bước 2: Lấy dự báo 5 ngày
+                            weatherApiService.getForecast(geoData.lat, geoData.lon, apiKey = apiKey)
+                                .enqueue(object : Callback<ForecastResponse> {
+                                    override fun onResponse(call: Call<ForecastResponse>, response: Response<ForecastResponse>) {
+                                        if (response.isSuccessful) {
+                                            val forecastData = response.body()?.list ?: emptyList()
+                                            // Tổng hợp dữ liệu 3 giờ thành dự báo hàng ngày
+                                            val dailyForecasts = aggregateDailyForecasts(forecastData)
+                                            Log.d(TAG, "Lấy dự báo thành công: ${dailyForecasts.size} ngày")
+                                            binding.forecastRecyclerView.adapter = ForecastAdapter(dailyForecasts)
+                                        } else {
+                                            val errorBody = response.errorBody()?.string() ?: "Lỗi không xác định"
+                                            Log.e(TAG, "Lỗi dự báo: HTTP ${response.code()}, $errorBody")
+                                            Toast.makeText(this@MainActivity, "Lỗi lấy dự báo: ${response.code()}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+
+                                    override fun onFailure(call: Call<ForecastResponse>, t: Throwable) {
+                                        Log.e(TAG, "Lỗi mạng dự báo: ${t.message}", t)
+                                        Toast.makeText(this@MainActivity, "Lỗi mạng: ${t.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                })
+                        } else {
+                            Log.e(TAG, "Lấy tọa độ thất bại: HTTP ${response.code()}")
+                            Toast.makeText(this@MainActivity, "Không tìm thấy thành phố", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    override fun onFailure(call: Call<List<GeocodingResponse>>, t: Throwable) {
+                        Log.e(TAG, "Lỗi mạng tọa độ: ${t.message}", t)
+                        Toast.makeText(this@MainActivity, "Lỗi mạng: ${t.message}", Toast.LENGTH_SHORT).show()
+                    }
+                })
+        }
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        System.out.println("log: onCreateOptionsMenu");
-        System.out.println("log: onCreateOptionsMenu");
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-        System.out.println("long đẹp trai");
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+    private fun aggregateDailyForecasts(forecastData: List<ForecastItem>): List<ForecastItem> {
+        val dailyForecasts = mutableListOf<ForecastItem>()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val groupedByDay = forecastData.groupBy {
+            dateFormat.format(Date(it.dt * 1000))
         }
 
-        return super.onOptionsItemSelected(item);
-    }
+        groupedByDay.forEach { (_, forecasts) ->
+            // Chọn dự báo gần trưa (12:00) nhất cho mỗi ngày
+            val middayForecast = forecasts.minByOrNull { forecast ->
+                val forecastTime = Date(forecast.dt * 1000)
+                val hour = forecastTime.hours
+                Math.abs(hour - 12) // Ưu tiên dự báo gần 12:00
+            }
+            middayForecast?.let { dailyForecasts.add(it) }
+        }
 
-    @Override
-    public boolean onSupportNavigateUp() {
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
-        return NavigationUI.navigateUp(navController, appBarConfiguration)
-                || super.onSupportNavigateUp();
-        
+        // Giới hạn ở 5 ngày (API cung cấp 5 ngày dữ liệu)
+        return dailyForecasts.take(5)
     }
 }
