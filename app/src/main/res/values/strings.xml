@@ -11,4 +11,7 @@
     <string name="search_city">Search City</string>
     <string name="wed">Wed</string>
     <string name="sunny">sunny</string>
+    <string name="title_activity_maps">MapsActivity</string>
+    <string name="open_weather_map_api_key">0cc1b5e403e162a6abb1cd61236e59ce</string>
+    <string name="google_maps_api_key">AIzaSyCka406_WVL4sMy8wNmCOYQ9stPxf4E0_Y</string>
 </resources>

@@ -1,9 +1,14 @@
-package com.example.bandoapp;
+package com.example.weatherapp.activities;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.weatherapp.R;
+import com.example.weatherapp.response.WeatherHistory;
+
 import java.util.List;
 
 public class HistoryActivity extends AppCompatActivity {
@@ -23,5 +28,15 @@ public class HistoryActivity extends AppCompatActivity {
                     entry.location, entry.temp, entry.description, entry.timestamp));
         }
         historyListView.setAdapter(adapter);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Ensure returning to MapActivity
+        super.onBackPressed();
+        Intent intent = new Intent(this, MapActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
     }
 }

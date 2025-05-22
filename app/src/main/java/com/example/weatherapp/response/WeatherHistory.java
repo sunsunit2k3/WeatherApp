@@ -1,4 +1,4 @@
-package com.example.weatherapp.activities;
+package com.example.weatherapp.response;
 
 import android.content.Context;
 import android.content.SharedPreferences;

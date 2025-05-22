@@ -78,14 +78,28 @@ public class MainActivity extends AppCompatActivity {
         hourlyAdapter = new HourlyAdapter(items);
         recyclerViewHourly.setAdapter(hourlyAdapter);
 
-        textNext5Days.setOnClickListener(v -> setIntentExtras());
-        textNameCity.setText("");
-        textNameCity.setVisibility(View.GONE);
+        // Restore state if available
+        if (savedInstanceState != null) {
+            nameCity = savedInstanceState.getString("nameCity", "");
+            String searchText = savedInstanceState.getString("searchText", "");
+            editTextSearch.setText(searchText);
+            if (!nameCity.isEmpty()) {
+                textNameCity.setText(nameCity);
+                textNameCity.setVisibility(View.VISIBLE);
+                getCurrentWeatherData(nameCity);
+                getHourlyData(nameCity);
+            }
+        } else {
+            textNameCity.setText("");
+            textNameCity.setVisibility(View.GONE);
+        }
 
+        textNext5Days.setOnClickListener(v -> setIntentExtras());
         imgMap.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, MapActivity.class);
-            // Optionally pass data, e.g., city name or coordinates
-            intent.putExtra("name", nameCity);
+            // Pass latitude and longitude if needed
+            intent.putExtra("latitude", "");
+            intent.putExtra("longitude", "");
             startActivity(intent);
         });
         imgSearch.setOnClickListener(v -> {
@@ -102,6 +116,13 @@ public class MainActivity extends AppCompatActivity {
         });
 
         imgLocation.setOnClickListener(v -> checkLocationPermissionAndFetch());
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString("nameCity", nameCity);
+        outState.putString("searchText", editTextSearch.getText().toString());
     }
 
     private void setMapping() {
